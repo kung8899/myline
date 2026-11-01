@@ -4,62 +4,81 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>正在同步資料...</title>
+  <!-- 必須載入 LIFF SDK，原本缺少這行，所以 liff 永遠是 undefined -->
+  <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 </head>
 <body>
-  <div id="status" style="text-align: center; margin-top: 50px; font-size: 18px; font-family: sans-serif; padding: 20px;">
+  <div id="status" style="text-align:center;margin-top:50px;font-size:18px;font-family:sans-serif;padding:20px;">
     系統載入中，請稍候...
-  </div>    
+  </div>
 
   <script>
-    if (typeof liff === "undefined") {
-      document.getElementById("status").style.color = "red";
-      document.getElementById("status").innerText = "❌ LINE SDK 載入失敗，請確認網路連線。";
-    } else {
-      document.getElementById("status").style.color = "black";
-      document.getElementById("status").innerText = "網頁腳本啟動，正在初始化 LINE SDK...";
+    const LIFF_ID = "2012308870-xwtXvPn5";
+    // 換成你的 Google Apps Script「網頁應用程式」部署網址（結尾是 /exec）
+    const GAS_URL = "https://script.google.com/macros/s/你的部署ID/exec";
+
+    const statusEl = document.getElementById("status");
+    function setStatus(text, color) {
+      statusEl.style.color = color;
+      statusEl.innerText = text;
+    }
+
+    async function main() {
+      if (typeof liff === "undefined") {
+        setStatus("❌ LINE SDK 載入失敗，請確認網路連線。", "red");
+        return;
+      }
+
+      setStatus("正在初始化 LINE SDK...", "black");
 
       try {
-        liff.init({ liffId: "2012308870-xwtXvPn5" })
-          .then(() => {
-            if (!liff.isLoggedIn()) {
-              liff.login();
-            } else {
-              liff.getProfile().then(profile => {
-                const userId = profile.userId;
-                const userLang = liff.getLanguage() || "zh";
-                let langCode = userLang.startsWith("zh") ? "zh" : "en";
-
-                document.getElementById("status").style.color = "blue";
-                document.getElementById("status").innerText = "已取得資料，正在同步至試算表...";
-
-                const gasUrl = "https://google.com"; 
-                const targetUrl = `${gasUrl}?lineUserId=${encodeURIComponent(userId)}&preferredLanguage=${encodeURIComponent(langCode)}`;
-
-                fetch(targetUrl, { method: "GET", mode: "no-cors" })
-                  .then(() => {
-                    document.getElementById("status").style.color = "green";
-                    document.getElementById("status").innerText = "🎉 資料同步成功！即將關閉視窗...";
-                    setTimeout(() => { liff.closeWindow(); }, 2000);
-                  })
-                  .catch(err => {
-                    document.getElementById("status").style.color = "red";
-                    document.getElementById("status").innerText = "【傳送失敗】網路連線錯誤: " + err.toString();
-                  });
-              }).catch(err => {
-                document.getElementById("status").style.color = "red";
-                document.getElementById("status").innerText = "【獲取個人資料失敗】原因: " + err.toString();
-              });
-            }
-          })
-          .catch((err) => {
-            document.getElementById("status").style.color = "red";
-            document.getElementById("status").innerText = "【LIFF 初始化失敗】原因: " + JSON.stringify(err);
-          });
-      } catch (globalError) {
-        document.getElementById("status").style.color = "red";
-        document.getElementById("status").innerText = "【腳本執行錯誤】: " + globalError.message;
+        await liff.init({ liffId: LIFF_ID });
+      } catch (err) {
+        setStatus("【LIFF 初始化失敗】原因: " + (err.message || JSON.stringify(err)), "red");
+        return;
       }
+
+      if (!liff.isLoggedIn()) {
+        liff.login({ redirectUri: location.href });
+        return;
+      }
+
+      let profile;
+      try {
+        profile = await liff.getProfile();
+      } catch (err) {
+        setStatus("【獲取個人資料失敗】原因: " + err.message + "（請確認 LIFF 已勾選 profile scope）", "red");
+        return;
+      }
+
+      const lang = (liff.getAppLanguage ? liff.getAppLanguage() : liff.getLanguage()) || "zh";
+      const langCode = lang.startsWith("zh") ? "zh" : "en";
+
+      setStatus("已取得資料，正在同步至試算表...", "blue");
+
+      const url = `${GAS_URL}?lineUserId=${encodeURIComponent(profile.userId)}&preferredLanguage=${encodeURIComponent(langCode)}`;
+
+      try {
+        // GAS 部署為「任何人」存取時支援 CORS，可讀取回應確認是否真的寫入成功
+        const res = await fetch(url, { method: "GET", redirect: "follow" });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        await res.text();
+      } catch (err) {
+        setStatus("【傳送失敗】" + err.toString(), "red");
+        return;
+      }
+
+      setStatus("🎉 資料同步成功！即將關閉視窗...", "green");
+      setTimeout(() => {
+        if (liff.isInClient()) {
+          liff.closeWindow();
+        } else {
+          setStatus("🎉 資料同步成功！您可以關閉此頁面。", "green");
+        }
+      }, 2000);
     }
+
+    main();
   </script>
 </body>
 </html>
