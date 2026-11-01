@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>正在同步資料...</title>
+</head>
+<body>
+  <div id="status" style="text-align: center; margin-top: 50px; font-size: 18px; font-family: sans-serif; padding: 20px;">
+    系統載入中，請稍候...
+  </div>
+
+  <!-- 【最核心修正】使用完全正確的官方 LINE SDK 網址，徹底告別 line-scdn 錯誤 -->
+  <script src="https://line-scdn.net"></script>
+
+  <script>
+    if (typeof liff === "undefined") {
+      document.getElementById("status").style.color = "red";
+      document.getElementById("status").innerText = "❌ LINE SDK 載入失敗，請確認網路連線。";
+    } else {
+      document.getElementById("status").style.color = "black";
+      document.getElementById("status").innerText = "網頁腳本啟動，正在初始化 LINE SDK...";
+
+      try {
+        liff.init({ liffId: "2012308870-xwtXvPn5" })
+          .then(() => {
+            if (!liff.isLoggedIn()) {
+              liff.login();
+            } else {
+              liff.getProfile().then(profile => {
+                const userId = profile.userId;
+                const userLang = liff.getLanguage() || "zh";
+                let langCode = userLang.startsWith("zh") ? "zh" : "en";
+
+                document.getElementById("status").style.color = "blue";
+                document.getElementById("status").innerText = "已取得資料，正在同步至試算表...";
+
+                const gasUrl = "https://google.com"; 
+                const targetUrl = `${gasUrl}?lineUserId=${encodeURIComponent(userId)}&preferredLanguage=${encodeURIComponent(langCode)}`;
+
+                fetch(targetUrl, { method: "GET", mode: "no-cors" })
+                  .then(() => {
+                    document.getElementById("status").style.color = "green";
+                    document.getElementById("status").innerText = "🎉 資料同步成功！即將關閉視窗...";
+                    setTimeout(() => { liff.closeWindow(); }, 2000);
+                  })
+                  .catch(err => {
+                    document.getElementById("status").style.color = "red";
+                    document.getElementById("status").innerText = "【傳送失敗】網路連線錯誤: " + err.toString();
+                  });
+              }).catch(err => {
+                document.getElementById("status").style.color = "red";
+                document.getElementById("status").innerText = "【獲取個人資料失敗】原因: " + err.toString();
+              });
+            }
+          })
+          .catch((err) => {
+            document.getElementById("status").style.color = "red";
+            document.getElementById("status").innerText = "【LIFF 初始化失敗】原因: " + JSON.stringify(err);
+          });
+      } catch (globalError) {
+        document.getElementById("status").style.color = "red";
+        document.getElementById("status").innerText = "【腳本執行錯誤】: " + globalError.message;
+      }
+    }
+  </script>
+</body>
+</html>
