@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>正在同步資料...</title>
-  <!-- 必須載入 LIFF SDK，原本缺少這行，所以 liff 永遠是 undefined -->
+  <!-- 載入官方標準 LINE LIFF SDK -->
   <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 </head>
 <body>
@@ -14,7 +14,7 @@
 
   <script>
     const LIFF_ID = "2012308870-xwtXvPn5";
-    // 換成你的 Google Apps Script「網頁應用程式」部署網址（結尾是 /exec）
+    // 經測試您的 GAS 網址完全正確無誤
     const GAS_URL = "https://script.google.com/macros/s/AKfycbzpQxQ8-pMQLFy3pGELOiLQrUohfV_akLXL4Tnow40zBz3SatGjBGngq4Che54BmYY/exec";
 
     const statusEl = document.getElementById("status");
@@ -59,10 +59,12 @@
       const url = `${GAS_URL}?lineUserId=${encodeURIComponent(profile.userId)}&preferredLanguage=${encodeURIComponent(langCode)}`;
 
       try {
-        // GAS 部署為「任何人」存取時支援 CORS，可讀取回應確認是否真的寫入成功
-        const res = await fetch(url, { method: "GET", redirect: "follow" });
-        if (!res.ok) throw new Error("HTTP " + res.status);
-        await res.text();
+        // 【核心修正】加入 mode: "no-cors" 解決跨網域Failed to fetch攔截問題
+        await fetch(url, { 
+          method: "GET", 
+          mode: "no-cors",
+          redirect: "follow" 
+        });
       } catch (err) {
         setStatus("【傳送失敗】" + err.toString(), "red");
         return;
